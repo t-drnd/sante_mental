@@ -1,26 +1,22 @@
-import { auth } from "./auth";
-import { cookies } from "next/headers";
+import { getSession as getAuthSession } from "./auth-simple";
 
 export async function getSession() {
   try {
-    const cookieStore = await cookies();
-    const cookieHeader = cookieStore.toString();
+    const user = await getAuthSession();
 
-    if (!cookieHeader) {
+    if (!user) {
       return null;
     }
 
-    const session = await auth.api.getSession({
-      headers: {
-        cookie: cookieHeader,
+    return {
+      user: {
+        id: user.id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
-    });
-
-    return session?.user ? session : null;
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("Error getting session:", error);
-    }
+    };
+  } catch (err) {
     return null;
   }
 }

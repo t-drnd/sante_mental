@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, schema } from '@/lib/db'
 import { getSession } from '@/lib/get-session'
 import { z } from 'zod'
+import { eq, and, gte, lte, desc } from 'drizzle-orm'
 
 const journalEntrySchema = z.object({
   date: z.string().optional(),
@@ -20,22 +21,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const userId = parseInt(session.user.id)
 
-    const where: any = { userId: session.user.id }
+    let conditions: any[] = [eq(schema.journalEntriesTable.userId, userId)]
+
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      }
+      conditions.push(
+        gte(schema.journalEntriesTable.date, new Date(startDate)),
+        lte(schema.journalEntriesTable.date, new Date(endDate))
+      )
     }
 
-    const entries = await db.journalEntry.findMany({
-      where,
-      orderBy: { date: 'desc' },
-    })
+    const entries = await db
+      .select()
+      .from(schema.journalEntriesTable)
+      .where(and(...conditions))
+      .orderBy(desc(schema.journalEntriesTable.date))
 
     return NextResponse.json(entries)
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json(
       { error: 'Erreur lors de la récupération des entrées' },
       { status: 500 }
@@ -52,36 +56,52 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = journalEntrySchema.parse(body)
+    const userId = parseInt(session.user.id)
 
-    const date = data.date ? new Date(data.date) : new Date()
-    date.setHours(0, 0, 0, 0)
+    const entryDate = data.date ? new Date(data.date) : new Date()
+    entryDate.setHours(0, 0, 0, 0)
 
-    const entry = await db.journalEntry.upsert({
-      where: {
-        userId_date: {
-          userId: session.user.id,
-          date,
-        },
-      },
-      update: {
+    const existing = await db
+      .select()
+      .from(schema.journalEntriesTable)
+      .where(
+        and(
+          eq(schema.journalEntriesTable.userId, userId),
+          eq(schema.journalEntriesTable.date, entryDate)
+        )
+      )
+      .limit(1)
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(schema.journalEntriesTable)
+        .set({
+          moodScore: data.moodScore,
+          emotion: data.emotion || null,
+          notes: data.notes || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.journalEntriesTable.id, existing[0].id))
+        .returning()
+
+      return NextResponse.json(updated)
+    }
+
+    const [newEntry] = await db
+      .insert(schema.journalEntriesTable)
+      .values({
+        userId,
+        date: entryDate,
         moodScore: data.moodScore,
-        emotion: data.emotion,
-        notes: data.notes,
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: session.user.id,
-        date,
-        moodScore: data.moodScore,
-        emotion: data.emotion,
-        notes: data.notes,
-      },
-    })
+        emotion: data.emotion || null,
+        notes: data.notes || null,
+      })
+      .returning()
 
-    return NextResponse.json(entry)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
+    return NextResponse.json(newEntry)
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.issues }, { status: 400 })
     }
     return NextResponse.json(
       { error: 'Erreur lors de la création de l\'entrée' },
@@ -89,4 +109,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

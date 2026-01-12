@@ -19,18 +19,18 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/sign-in/email', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
 
-      if (res.ok) {
-        router.push('/dashboard')
-        router.refresh()
-      } else {
+          if (res.ok) {
+            router.push('/home')
+            router.refresh()
+          } else {
         const data = await res.json()
-        setError(data.message || 'Erreur de connexion')
+        setError(data.error || 'Erreur de connexion')
       }
     } catch (err) {
       setError('Une erreur est survenue')
@@ -48,12 +48,12 @@ export function LoginForm() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
               {error}
             </div>
           )}
           <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
+            <label htmlFor="email" className="text-sm font-medium text-[#f5f5f5]">
               Email
             </label>
             <Input
@@ -66,7 +66,7 @@ export function LoginForm() {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium">
+            <label htmlFor="password" className="text-sm font-medium text-[#f5f5f5]">
               Mot de passe
             </label>
             <Input
@@ -81,7 +81,7 @@ export function LoginForm() {
             {loading ? 'Connexion...' : 'Se connecter'}
           </Button>
           <div className="text-center text-sm">
-            <a href="/register" className="text-blue-600 hover:underline">
+            <a href="/register" className="text-purple-400 hover:text-purple-300 transition-colors">
               Pas encore de compte ? Inscrivez-vous
             </a>
           </div>

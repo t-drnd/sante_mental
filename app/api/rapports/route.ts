@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/get-session";
 import { startOfWeek, endOfWeek, subWeeks } from "date-fns";
+import { eq, and, gte, lte } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const weekOffset = parseInt(searchParams.get("weekOffset") || "0");
+    const userId = parseInt(session.user.id);
 
     const targetDate = new Date();
     const weekStart = startOfWeek(subWeeks(targetDate, weekOffset), {
@@ -19,50 +21,53 @@ export async function GET(request: NextRequest) {
     });
     const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
 
-    // Vérifier si un rapport existe déjà
-    const existingReport = await db.weeklyReport.findUnique({
-      where: {
-        userId_weekStart: {
-          userId: session.user.id,
-          weekStart,
-        },
-      },
-    });
+    const existingReport = await db
+      .select()
+      .from(schema.weeklyReportsTable)
+      .where(
+        and(
+          eq(schema.weeklyReportsTable.userId, userId),
+          eq(schema.weeklyReportsTable.weekStart, weekStart)
+        )
+      )
+      .limit(1);
 
-    if (existingReport) {
-      return NextResponse.json(existingReport);
+    if (existingReport.length > 0) {
+      return NextResponse.json(existingReport[0]);
     }
 
-    // Générer le rapport - récupérer toutes les données en parallèle
     const [journalEntries, meditationSessions, productivityEntries] =
       await Promise.all([
-        db.journalEntry.findMany({
-          where: {
-            userId: session.user.id,
-            date: {
-              gte: weekStart,
-              lte: weekEnd,
-            },
-          },
-        }),
-        db.meditationSession.findMany({
-          where: {
-            userId: session.user.id,
-            date: {
-              gte: weekStart,
-              lte: weekEnd,
-            },
-          },
-        }),
-        db.productivityEntry.findMany({
-          where: {
-            userId: session.user.id,
-            date: {
-              gte: weekStart,
-              lte: weekEnd,
-            },
-          },
-        }),
+        db
+          .select()
+          .from(schema.journalEntriesTable)
+          .where(
+            and(
+              eq(schema.journalEntriesTable.userId, userId),
+              gte(schema.journalEntriesTable.date, weekStart),
+              lte(schema.journalEntriesTable.date, weekEnd)
+            )
+          ),
+        db
+          .select()
+          .from(schema.meditationSessionsTable)
+          .where(
+            and(
+              eq(schema.meditationSessionsTable.userId, userId),
+              gte(schema.meditationSessionsTable.date, weekStart),
+              lte(schema.meditationSessionsTable.date, weekEnd)
+            )
+          ),
+        db
+          .select()
+          .from(schema.productivityEntriesTable)
+          .where(
+            and(
+              eq(schema.productivityEntriesTable.userId, userId),
+              gte(schema.productivityEntriesTable.date, weekStart),
+              lte(schema.productivityEntriesTable.date, weekEnd)
+            )
+          ),
       ]);
 
     const averageMoodScore =
@@ -81,7 +86,6 @@ export async function GET(request: NextRequest) {
       (e) => e.completed
     ).length;
 
-    // Générer des insights
     let insights = "";
     let recommendations = "";
 
@@ -108,9 +112,10 @@ export async function GET(request: NextRequest) {
         "Vous pourriez bénéficier de mieux prioriser vos tâches pour améliorer votre taux de complétion. ";
     }
 
-    const report = await db.weeklyReport.create({
-      data: {
-        userId: session.user.id,
+    const [report] = await db
+      .insert(schema.weeklyReportsTable)
+      .values({
+        userId,
         weekStart,
         weekEnd,
         averageMoodScore,
@@ -119,12 +124,11 @@ export async function GET(request: NextRequest) {
         completedTasks: completedTasks || null,
         insights: insights || null,
         recommendations: recommendations || null,
-      },
-    });
+      })
+      .returning();
 
     return NextResponse.json(report);
-  } catch (error) {
-    console.error("Erreur génération rapport:", error);
+  } catch (err) {
     return NextResponse.json(
       { error: "Erreur lors de la génération du rapport" },
       { status: 500 }

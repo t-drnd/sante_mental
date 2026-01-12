@@ -1,6 +1,6 @@
 import { Nav } from '@/components/navigation/nav'
 import { getSession } from '@/lib/get-session'
-import { redirect } from 'next/navigation'
+// import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
   children,
@@ -9,12 +9,14 @@ export default async function DashboardLayout({
 }) {
   const session = await getSession()
 
-  if (!session) {
-    redirect('/login')
-  }
+  // Désactivé pour faciliter le développement
+  // Pour réactiver la protection des routes, décommentez les lignes suivantes :
+  // if (!session) {
+  //   redirect('/login')
+  // }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0a0a0a]">
       <Nav />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, schema } from '@/lib/db'
 import { getSession } from '@/lib/get-session'
 import { z } from 'zod'
+import { eq, and, gte, lte, desc } from 'drizzle-orm'
 
 const productivityEntrySchema = z.object({
   date: z.string().optional(),
@@ -23,25 +24,29 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const completed = searchParams.get('completed')
+    const userId = parseInt(session.user.id)
 
-    const where: any = { userId: session.user.id }
+    let conditions: any[] = [eq(schema.productivityEntriesTable.userId, userId)]
+
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      }
-    }
-    if (completed !== null) {
-      where.completed = completed === 'true'
+      conditions.push(
+        gte(schema.productivityEntriesTable.date, new Date(startDate)),
+        lte(schema.productivityEntriesTable.date, new Date(endDate))
+      )
     }
 
-    const entries = await db.productivityEntry.findMany({
-      where,
-      orderBy: { date: 'desc' },
-    })
+    if (completed !== null) {
+      conditions.push(eq(schema.productivityEntriesTable.completed, completed === 'true'))
+    }
+
+    const entries = await db
+      .select()
+      .from(schema.productivityEntriesTable)
+      .where(and(...conditions))
+      .orderBy(desc(schema.productivityEntriesTable.date))
 
     return NextResponse.json(entries)
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json(
       { error: 'Erreur lors de la récupération des tâches' },
       { status: 500 }
@@ -58,26 +63,28 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = productivityEntrySchema.parse(body)
+    const userId = parseInt(session.user.id)
 
-    const date = data.date ? new Date(data.date) : new Date()
-    date.setHours(0, 0, 0, 0)
+    const entryDate = data.date ? new Date(data.date) : new Date()
+    entryDate.setHours(0, 0, 0, 0)
 
-    const entry = await db.productivityEntry.create({
-      data: {
-        userId: session.user.id,
-        date,
+    const [newEntry] = await db
+      .insert(schema.productivityEntriesTable)
+      .values({
+        userId,
+        date: entryDate,
         task: data.task,
-        description: data.description,
-        timeSpent: data.timeSpent,
+        description: data.description || null,
+        timeSpent: data.timeSpent || null,
         completed: data.completed ?? false,
-        priority: data.priority ?? 'medium',
-      },
-    })
+        priority: data.priority || null,
+      })
+      .returning()
 
-    return NextResponse.json(entry)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
+    return NextResponse.json(newEntry)
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.issues }, { status: 400 })
     }
     return NextResponse.json(
       { error: 'Erreur lors de la création de la tâche' },
@@ -94,18 +101,25 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, ...data } = body
+    const { id, ...updateData } = body
+    const userId = parseInt(session.user.id)
 
-    const entry = await db.productivityEntry.update({
-      where: {
-        id,
-        userId: session.user.id,
-      },
-      data,
-    })
+    const [updated] = await db
+      .update(schema.productivityEntriesTable)
+      .set({
+        ...updateData,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.productivityEntriesTable.id, id),
+          eq(schema.productivityEntriesTable.userId, userId)
+        )
+      )
+      .returning()
 
-    return NextResponse.json(entry)
-  } catch (error) {
+    return NextResponse.json(updated)
+  } catch (err) {
     return NextResponse.json(
       { error: 'Erreur lors de la mise à jour de la tâche' },
       { status: 500 }
@@ -121,25 +135,27 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
+    const id = parseInt(searchParams.get('id') || '0')
+    const userId = parseInt(session.user.id)
 
     if (!id) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 })
     }
 
-    await db.productivityEntry.delete({
-      where: {
-        id,
-        userId: session.user.id,
-      },
-    })
+    await db
+      .delete(schema.productivityEntriesTable)
+      .where(
+        and(
+          eq(schema.productivityEntriesTable.id, id),
+          eq(schema.productivityEntriesTable.userId, userId)
+        )
+      )
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json(
       { error: 'Erreur lors de la suppression de la tâche' },
       { status: 500 }
     )
   }
 }
-
