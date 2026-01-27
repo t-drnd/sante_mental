@@ -1,5 +1,4 @@
-import { db } from "./db";
-import { usersTable } from "./schema";
+import { db, schema } from "./db";
 import { eq } from "drizzle-orm";
 
 export type Role = "user" | "admin";
@@ -60,9 +59,9 @@ export function canAccess(
 
 export async function getUserRole(userId: number): Promise<Role | null> {
   const result = await db
-    .select({ role: usersTable.role })
-    .from(usersTable)
-    .where(eq(usersTable.id, userId))
+    .select({ role: schema.usersTable.role })
+    .from(schema.usersTable)
+    .where(eq(schema.usersTable.id, userId))
     .limit(1);
 
   if (result.length === 0) {

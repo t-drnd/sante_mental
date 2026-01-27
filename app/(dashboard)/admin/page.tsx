@@ -1,13 +1,12 @@
 import { requireRole } from "@/lib/middleware";
-import { db } from "@/lib/db";
-import { usersTable } from "@/lib/schema";
+import { db, schema } from "@/lib/db";
 
 export default async function AdminPage() {
   // Cette page nécessite le rôle admin
   const { session, role } = await requireRole("admin");
 
   // Récupérer tous les utilisateurs (seul l'admin peut faire ça)
-  const users = await db.select().from(usersTable);
+  const users = await db.select().from(schema.usersTable);
 
   return (
     <div className="space-y-6">

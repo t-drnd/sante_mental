@@ -1,5 +1,4 @@
-import { db } from "./db";
-import { usersTable } from "./schema";
+import { db, schema } from "./db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
@@ -65,8 +64,8 @@ export async function deleteSession() {
 export async function authenticate(email: string, password: string): Promise<AuthUser | null> {
   const result = await db
     .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, email))
+    .from(schema.usersTable)
+    .where(eq(schema.usersTable.email, email))
     .limit(1);
 
   if (result.length === 0) {
@@ -96,8 +95,8 @@ export async function createUser(data: {
 }): Promise<AuthUser> {
   const existingUsers = await db
     .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, data.email))
+    .from(schema.usersTable)
+    .where(eq(schema.usersTable.email, data.email))
     .limit(1);
 
   if (existingUsers.length > 0) {
@@ -107,7 +106,7 @@ export async function createUser(data: {
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
   const [newUser] = await db
-    .insert(usersTable)
+    .insert(schema.usersTable)
     .values({
       email: data.email,
       password: hashedPassword,

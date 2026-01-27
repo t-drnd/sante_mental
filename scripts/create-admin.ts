@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { db } from "../lib/db";
-import { usersTable } from "../lib/schema";
+import { db, schema } from "../lib/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
@@ -11,20 +10,20 @@ async function createAdmin() {
 
   const existingUser = await db
     .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, adminEmail))
+    .from(schema.usersTable)
+    .where(eq(schema.usersTable.email, adminEmail))
     .limit(1);
 
   if (existingUser.length > 0) {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const [updatedAdmin] = await db
-      .update(usersTable)
+      .update(schema.usersTable)
       .set({
         name: adminName,
         role: "admin",
         password: hashedPassword,
       })
-      .where(eq(usersTable.email, adminEmail))
+      .where(eq(schema.usersTable.email, adminEmail))
       .returning();
 
     console.log("Compte admin mis à jour");
@@ -37,7 +36,7 @@ async function createAdmin() {
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   const [admin] = await db
-    .insert(usersTable)
+    .insert(schema.usersTable)
     .values({
       name: adminName,
       email: adminEmail,

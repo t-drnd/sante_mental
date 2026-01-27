@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { MoodForm } from '@/components/journal/mood-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
@@ -112,6 +113,30 @@ export default function JournalPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-semibold text-[#f5f5f5] mb-4">
+          Autres outils de journal
+        </h2>
+        <Link href="/journal-guide">
+          <Card className="hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10 cursor-pointer group">
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <span className="text-3xl">📋</span>
+                <CardTitle className="text-lg">Journal guidé</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-[#a0a0a0] mb-4 text-sm">
+                Réponds aux questions du jour pour approfondir ta réflexion
+              </p>
+              <div className="flex items-center text-cyan-400 group-hover:text-cyan-300 transition-colors">
+                <span className="text-sm">Commencer →</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   )

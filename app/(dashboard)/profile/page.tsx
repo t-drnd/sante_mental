@@ -1,18 +1,35 @@
-import { requireAuth } from "@/lib/middleware";
-import { db } from "@/lib/db";
-import { usersTable } from "@/lib/schema";
+import { getSession } from "@/lib/get-session";
+import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
 export default async function ProfilePage() {
-  // Cette page nécessite une authentification
-  const session = await requireAuth();
+  const session = await getSession();
+  if (!session?.user?.id) {
+    return <div>Session invalide</div>;
+  }
+
+  const userId = Number.parseInt(session.user.id, 10);
+  if (Number.isNaN(userId)) {
+    return <div>Session invalide</div>;
+  }
 
   // Récupérer les informations de l'utilisateur connecté
-  const user = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, session.user.email!))
-    .limit(1);
+  let user;
+  try {
+    user = await db
+      .select({
+        id: schema.usersTable.id,
+        name: schema.usersTable.name,
+        age: schema.usersTable.age,
+        email: schema.usersTable.email,
+        role: schema.usersTable.role,
+      })
+      .from(schema.usersTable)
+      .where(eq(schema.usersTable.id, userId))
+      .limit(1);
+  } catch (error) {
+    return <div>Impossible de charger votre profil pour le moment.</div>;
+  }
 
   if (user.length === 0) {
     return <div>Utilisateur non trouvé</div>;
@@ -24,9 +41,7 @@ export default async function ProfilePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Mon profil</h1>
-        <p className="text-gray-600">
-          Gérez vos informations personnelles
-        </p>
+        <p className="text-gray-600">Gérez vos informations personnelles</p>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
@@ -77,6 +92,3 @@ export default async function ProfilePage() {
     </div>
   );
 }
-
-
-

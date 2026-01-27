@@ -33,12 +33,20 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
+    const error = err as { code?: string; cause?: { code?: string } };
+    const code = error?.code ?? error?.cause?.code;
+
+    if (code === "ECONNREFUSED") {
+      return NextResponse.json(
+        { error: "Base de données indisponible" },
+        { status: 503 }
+      );
+    }
+
+    console.error("Login error:", err);
     return NextResponse.json(
       { error: "Une erreur est survenue" },
       { status: 500 }
     );
   }
 }
-
-
-
